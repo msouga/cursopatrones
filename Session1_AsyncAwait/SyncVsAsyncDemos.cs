@@ -3,6 +3,9 @@
 public static class SyncVsAsyncDemos
 {
     private static readonly HttpClient _httpClient = new();
+    // Archivo que descargaremos y guardaremos localmente.
+    private const string Url = "https://rubin.canto.com/direct/image/n4kvj0cemd5pbdqgtjdgp2jg2t/2rlAe6gN9INGmu5lzQeECpD8fy0/original?content-type=image%2Ftiff&name=lm4-Trifid-10k.tif";
+    private const string FileName = "lm4-Trifid-10k.tif";
 
     public static async Task EjecutarDemo()
     {
@@ -22,9 +25,10 @@ public static class SyncVsAsyncDemos
         var actividadTask = MostrarActividadMientrasEspera();
 
         // Esta llamada bloquea el hilo principal.
-        var resultado = DescargarSitioSincrono();
+        var rutaArchivo = DescargarArchivoSincrono();
 
-        Console.WriteLine($"\nDescarga síncrona completada. Tamaño: {resultado.Length} caracteres.");
+        var info = new FileInfo(rutaArchivo);
+        Console.WriteLine($"\nDescarga síncrona completada. Archivo guardado en {info.FullName} ({info.Length} bytes).");
         actividadTask.Wait();
     }
 
@@ -36,22 +40,27 @@ public static class SyncVsAsyncDemos
         var actividadTask = MostrarActividadMientrasEspera();
 
         // Esta llamada NO bloquea el hilo principal. Lo libera.
-        var resultado = await DescargarSitioAsincronoAsync();
+        var rutaArchivo = await DescargarArchivoAsincronoAsync();
 
-        Console.WriteLine($"\nDescarga asíncrona completada. Tamaño: {resultado.Length} caracteres.");
+        var info = new FileInfo(rutaArchivo);
+        Console.WriteLine($"\nDescarga asíncrona completada. Archivo guardado en {info.FullName} ({info.Length} bytes).");
         await actividadTask;
     }
 
-    private static string DescargarSitioSincrono()
+    private static string DescargarArchivoSincrono()
     {
         // ¡ANTIPATRÓN! Usamos .Result para forzar el bloqueo y simular código síncrono.
-        return _httpClient.GetStringAsync("https://www.microsoft.com").Result;
+        var bytes = _httpClient.GetByteArrayAsync(Url).Result;
+        File.WriteAllBytes(FileName, bytes);
+        return Path.GetFullPath(FileName);
     }
 
-    private static async Task<string> DescargarSitioAsincronoAsync()
+    private static async Task<string> DescargarArchivoAsincronoAsync()
     {
         // FORMA CORRECTA: Usamos await para esperar sin bloquear.
-        return await _httpClient.GetStringAsync("https://www.microsoft.com");
+        var bytes = await _httpClient.GetByteArrayAsync(Url);
+        await File.WriteAllBytesAsync(FileName, bytes);
+        return Path.GetFullPath(FileName);
     }
 
     private static async Task MostrarActividadMientrasEspera()
