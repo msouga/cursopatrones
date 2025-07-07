@@ -42,9 +42,10 @@ public static class SyncVsAsyncDemos
         // Esta llamada NO bloquea el hilo principal. Lo libera.
         var rutaArchivo = await DescargarArchivoAsincronoAsync();
 
+        await actividadTask;
+
         var info = new FileInfo(rutaArchivo);
         Console.WriteLine($"\nDescarga asíncrona completada. Archivo guardado en {info.FullName} ({info.Length} bytes).");
-        await actividadTask;
     }
 
     private static string DescargarArchivoSincrono()
