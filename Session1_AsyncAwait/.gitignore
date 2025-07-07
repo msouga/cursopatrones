@@ -1,0 +1,17 @@
+# .NET Core build-related
+[Bb]in/
+[Oo]bj/
+
+# Rider-specific
+.idea/
+
+# Visual Studio-specific
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Otros
+*.DS_Store
+*.swp
