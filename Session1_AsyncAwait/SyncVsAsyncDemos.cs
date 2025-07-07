@@ -1,11 +1,11 @@
-// SyncVsAsyncDemos.cs: Muestra la diferencia clave.
+// SyncVsAsyncDemos.cs: (VERSIÓN FINAL Y CORREGIDA)
+// Demuestra el bloqueo de forma inequívoca.
 
 public static class SyncVsAsyncDemos
 {
     private static readonly HttpClient _httpClient = new();
-    // Archivo que descargaremos y guardaremos localmente.
     private const string Url = "https://rubin.canto.com/direct/image/n4kvj0cemd5pbdqgtjdgp2jg2t/2rlAe6gN9INGmu5lzQeECpD8fy0/original?content-type=image%2Ftiff&name=lm4-Trifid-10k.tif";
-    private const string FileName = "lm4-Trifid-10k.tif";
+    private const string FileName = "downloaded-file.tif";
 
     public static async Task EjecutarDemo()
     {
@@ -13,63 +13,78 @@ public static class SyncVsAsyncDemos
         Console.WriteLine("--- DEMO SÍNCRONO (BLOQUEANTE) ---");
         EjecutarDescargaSincrona();
 
-        Console.WriteLine("\n\n--- DEMO ASÍNCRONO (NO BLOQUEANTE) ---");
+        Console.WriteLine("\n\nPresiona Enter para continuar con la demo asíncrona...");
+        Console.ReadLine();
+
+        Console.Clear();
+        Console.WriteLine("--- DEMO ASÍNCRONO (NO BLOQUEANTE) ---");
         await EjecutarDescargaAsincronaAsync();
     }
 
     private static void EjecutarDescargaSincrona()
     {
-        Console.WriteLine("Iniciando descarga síncrona. La aplicación parecerá 'congelada'.");
-        Console.WriteLine("No verás los puntos de actividad hasta que la descarga termine.");
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        Console.WriteLine("La aplicación responderá durante 3 segundos. Escribe algo.");
 
-        var actividadTask = MostrarActividadMientrasEspera();
+        // Bucle de 3 segundos donde la aplicación está "viva"
+        while (stopwatch.Elapsed < TimeSpan.FromSeconds(3))
+        {
+            if (Console.KeyAvailable)
+            {
+                Console.ReadKey(true); // Lee la tecla pero no la muestra
+                Console.Write(".");    // Muestra un punto como feedback
+            }
+        }
 
-        // Esta llamada bloquea el hilo principal.
-        var rutaArchivo = DescargarArchivoSincrono();
+        Console.WriteLine("\n\n¡TIEMPO! Iniciando descarga síncrona AHORA.");
+        Console.WriteLine("==> LA APLICACIÓN SE CONGELARÁ. Intenta escribir, no pasará nada. <==");
 
-        var info = new FileInfo(rutaArchivo);
-        Console.WriteLine($"\nDescarga síncrona completada. Archivo guardado en {info.FullName} ({info.Length} bytes).");
-        actividadTask.Wait();
+        // --- EL BLOQUEO REAL ---
+        // Este es el momento en que el único hilo se bloquea.
+        // No hay otros hilos trabajando. El programa está muerto hasta que esto termine.
+        var bytes = _httpClient.GetByteArrayAsync(Url).Result;
+        File.WriteAllBytes(FileName, bytes);
+        // --- FIN DEL BLOQUEO ---
+
+        stopwatch.Stop();
+        Console.WriteLine($"\n\n¡Descarga completada! Tiempo total: {stopwatch.Elapsed.TotalSeconds:F2} segundos.");
+
+        var info = new FileInfo(FileName);
+        Console.WriteLine($"Archivo guardado ({info.Length} bytes).");
     }
 
     private static async Task EjecutarDescargaAsincronaAsync()
     {
-        Console.WriteLine("Iniciando descarga asíncrona. La aplicación seguirá 'viva'.");
-        Console.WriteLine("Verás los puntos de actividad MIENTRAS se realiza la descarga.");
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        Console.WriteLine("Iniciando descarga asíncrona EN SEGUNDO PLANO.");
+        Console.WriteLine("==> LA APLICACIÓN SEGUIRÁ RESPONDIENDO. Escribe en cualquier momento. <==");
 
-        var actividadTask = MostrarActividadMientrasEspera();
+        // 1. Inicia la operación de descarga pero NO la esperamos todavía.
+        //    Esto devuelve una 'Task' que representa el trabajo en curso.
+        Task<byte[]> downloadTask = _httpClient.GetByteArrayAsync(Url);
 
-        // Esta llamada NO bloquea el hilo principal. Lo libera.
-        var rutaArchivo = await DescargarArchivoAsincronoAsync();
-
-        await actividadTask;
-
-        var info = new FileInfo(rutaArchivo);
-        Console.WriteLine($"\nDescarga asíncrona completada. Archivo guardado en {info.FullName} ({info.Length} bytes).");
-    }
-
-    private static string DescargarArchivoSincrono()
-    {
-        // ¡ANTIPATRÓN! Usamos .Result para forzar el bloqueo y simular código síncrono.
-        var bytes = _httpClient.GetByteArrayAsync(Url).Result;
-        File.WriteAllBytes(FileName, bytes);
-        return Path.GetFullPath(FileName);
-    }
-
-    private static async Task<string> DescargarArchivoAsincronoAsync()
-    {
-        // FORMA CORRECTA: Usamos await para esperar sin bloquear.
-        var bytes = await _httpClient.GetByteArrayAsync(Url);
-        await File.WriteAllBytesAsync(FileName, bytes);
-        return Path.GetFullPath(FileName);
-    }
-
-    private static async Task MostrarActividadMientrasEspera()
-    {
-        for (int i = 0; i < 15; i++)
+        // 2. Mientras la tarea de descarga no haya terminado, nuestro hilo principal
+        //    sigue libre para hacer otras cosas, como ejecutar este bucle.
+        while (!downloadTask.IsCompleted)
         {
-            Console.Write(".");
-            await Task.Delay(200);
+            if (Console.KeyAvailable)
+            {
+                Console.ReadKey(true);
+                Console.Write(".");
+            }
+            // Hacemos una pequeña pausa asíncrona para no consumir 100% CPU.
+            await Task.Delay(100);
         }
+
+        // 3. Ahora que el bucle terminó (porque la descarga se completó),
+        //    podemos usar 'await' para obtener el resultado de forma segura.
+        var bytes = await downloadTask;
+        await File.WriteAllBytesAsync(FileName, bytes);
+
+        stopwatch.Stop();
+        Console.WriteLine($"\n\n¡Descarga completada! Tiempo total: {stopwatch.Elapsed.TotalSeconds:F2} segundos.");
+
+        var info = new FileInfo(FileName);
+        Console.WriteLine($"Archivo guardado ({info.Length} bytes).");
     }
 }

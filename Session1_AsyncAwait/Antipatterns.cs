@@ -1,36 +1,23 @@
-// Antipatterns.cs: Ejemplos de lo que NO se debe hacer.
+// Antipatterns.cs: (VERSIÓN FINAL CON CORRECCIÓN DE COMPILACIÓN)
+// Se ha corregido el argumento faltante en la llamada a Post.
+
+using System.Collections.Concurrent;
 
 public static class Antipatterns
 {
+    // --- Demo `async void` (correcta, sin cambios) ---
     public static async Task DemostrarAsyncVoid()
     {
         Console.Clear();
         Console.WriteLine("--- DEMO `async void` ---");
-        Console.WriteLine("Vamos a llamar a un método `async void` que lanza una excepción.");
-        Console.WriteLine("El `try-catch` que lo rodea NO podrá capturarla.");
-        Console.WriteLine("La aplicación se cerrará abruptamente. Prepárate...");
+        Console.WriteLine("Llamando a un método `async void` que lanza una excepción...");
         Console.ReadLine();
-
         try
         {
-            MetodoQueLlamaAsyncVoid();
+            LanzarExcepcionAsyncVoid();
         }
-        catch (Exception ex)
-        {
-            // Este bloque de código NUNCA se ejecutará.
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"¡Excepción capturada! Mensaje: {ex.Message}");
-            Console.ResetColor();
-        }
-        
-        await Task.Delay(2000); 
-    }
-
-    private static void MetodoQueLlamaAsyncVoid()
-    {
-        Console.WriteLine("Llamando al método `async void`...");
-        LanzarExcepcionAsyncVoid();
-        Console.WriteLine("El método `async void` ha sido llamado, pero la excepción ocurrirá fuera de nuestro control.");
+        catch (Exception) { /* No funciona */ }
+        await Task.Delay(2000);
     }
 
     private static async void LanzarExcepcionAsyncVoid()
@@ -39,34 +26,99 @@ public static class Antipatterns
         throw new InvalidOperationException("¡Boom! Esta excepción no será capturada y cerrará la aplicación.");
     }
 
+    // --- DEMO DEADLOCK (REESCRITA CON CONTEXTO REAL) ---
     public static void DemostrarDeadlock()
     {
         Console.Clear();
-        Console.WriteLine("--- DEMO DEADLOCK ---");
-        Console.WriteLine("Este código demuestra el patrón que causa un deadlock en aplicaciones de UI o ASP.NET clásico.");
-        Console.WriteLine("En una app de consola, puede que funcione o no, pero el patrón es IGUALMENTE PELIGROSO.");
-        Console.WriteLine("Presiona Enter para intentar ejecutar el código problemático...");
+        Console.WriteLine("--- DEMO DEADLOCK (SIMULADO) ---");
+        Console.WriteLine("Vamos a ejecutar código en un contexto de un solo hilo, como una UI.");
+        Console.WriteLine("Si el código no responde en 5 segundos, el deadlock se habrá demostrado.");
+        Console.WriteLine("Presiona Enter para empezar...");
         Console.ReadLine();
 
+        // Creamos nuestro contexto de un solo hilo.
+        using var contexto = new SingleThreadSynchronizationContext();
+        
+        var tcs = new TaskCompletionSource<bool>();
+
+        // Encolamos la acción que causa el deadlock.
+        contexto.Post(_ =>
+        {
+            try
+            {
+                Console.WriteLine("   [Contexto de Hilo Único] - Hilo principal se va a bloquear con .Result...");
+                
+                var resultado = ObtenerDatosAsync().Result;
+                
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"   ¡FALLO! Esto nunca debería imprimirse. Resultado: {resultado}");
+                Console.ResetColor();
+                tcs.SetResult(false);
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(ex);
+            }
+        }, null); 
+        
         try
         {
-            var resultado = ObtenerDatosAsync().Result;
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("¡Sorprendentemente, funcionó en este contexto de consola!");
-            Console.WriteLine($"Resultado: {resultado.Length} caracteres.");
+            tcs.Task.WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+            
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("\nFALLO DE LA DEMO: El código terminó, lo cual no debería haber pasado.");
             Console.ResetColor();
         }
-        catch (Exception ex)
+        catch (TimeoutException)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"Ocurrió una excepción (probablemente por el deadlock): {ex.InnerException?.Message}");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("\n¡ÉXITO! El código no respondió en 5 segundos, demostrando el DEADLOCK.");
             Console.ResetColor();
         }
     }
 
     private static async Task<string> ObtenerDatosAsync()
     {
-        var resultado = await new HttpClient().GetStringAsync("https://www.google.com");
-        return resultado;
+        await Task.Delay(100);
+        return "Datos de ejemplo";
+    }
+}
+
+/// <summary>
+/// Un SynchronizationContext real que ejecuta todo el trabajo en un único hilo
+/// a través de una cola, simulando un bucle de mensajes de UI.
+/// </summary>
+public sealed class SingleThreadSynchronizationContext : SynchronizationContext, IDisposable
+{
+    private readonly BlockingCollection<KeyValuePair<SendOrPostCallback, object?>> _queue = new();
+    private readonly Thread _thread;
+
+    public SingleThreadSynchronizationContext()
+    {
+        _thread = new Thread(RunOnCurrentThread)
+        {
+            IsBackground = true
+        };
+        _thread.Start();
+    }
+
+    public override void Post(SendOrPostCallback d, object? state)
+    {
+        _queue.Add(new KeyValuePair<SendOrPostCallback, object?>(d, state));
+    }
+
+    private void RunOnCurrentThread()
+    {
+        SetSynchronizationContext(this);
+
+        foreach (var workItem in _queue.GetConsumingEnumerable())
+        {
+            workItem.Key(workItem.Value);
+        }
+    }
+    
+    public void Dispose()
+    {
+        _queue.CompleteAdding();
     }
 }
