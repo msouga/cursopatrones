@@ -36,3 +36,26 @@ El código de esta sesión se encuentra en la carpeta `Session1_AsyncAwait`.
         *   Una aplicación de consola estándar no sufre este tipo de deadlock porque carece de un `SynchronizationContext` que fuerce al código a volver a un hilo específico.
         *   Para demostrar el problema de forma realista, esta demo **simula un entorno de UI** creando un contexto de un solo hilo.
         *   El objetivo es que el código se **congele intencionadamente**. Si la aplicación se pausa por 5 segundos y luego informa **"¡ÉXITO!"**, la demo ha funcionado correctamente al probar el deadlock.
+
+---
+
+## Sesión 2: Resiliencia con el Patrón Circuit Breaker
+
+El código de esta sesión se encuentra en la carpeta `Session2_CircuitBreaker`.
+
+### Dependencias
+
+Este proyecto requiere la librería **Polly**. El archivo `.csproj` ya está configurado para descargarla automáticamente.
+
+### ¿Cómo ejecutarlo?
+
+1.  Navega a la carpeta `Session2_CircuitBreaker`.
+    ```bash
+    cd ../Session2_CircuitBreaker 
+    ```
+    *(Nota: `../` si estás en la carpeta de la Sesión 1)*
+2.  Ejecuta la aplicación de consola.
+    ```bash
+    dotnet run
+    ```
+3.  La aplicación iniciará un bucle infinito que llama a un servicio simulado. Observa la consola para ver cómo la política de Circuit Breaker reacciona a los fallos, abre el circuito y eventualmente lo cierra de nuevo. Para detener la ejecución, presiona `Ctrl + C`.
