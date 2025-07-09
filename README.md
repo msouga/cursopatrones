@@ -1,6 +1,15 @@
-# Curso: Patrones Avanzados de Asincronía y Resiliencia en .NET
+# Curso de Patrones Avanzados en .NET
 
-¡Bienvenido al código de ejemplo del curso! Este repositorio contiene todos los proyectos de demostración utilizados en cada sesión.
+Este repositorio contiene el código fuente y los materiales para el curso de patrones de desarrollo avanzados en .NET.
+
+## Estructura del Proyecto
+
+El repositorio está organizado en carpetas, una por cada sesión del curso:
+
+-   **Session1_AsyncAwait/**: Demos sobre asincronía, `async/await`, bloqueos y deadlocks.
+-   **Session2_CircuitBreaker/**: Implementación del patrón Circuit Breaker con Polly.
+-   **Session3_SagaQueues/**: Implementación del patrón Saga con Orquestación usando Colas de Azure Service Bus.
+
 
 ## Sesión 1: Fundamentos de `async/await`
 
@@ -59,3 +68,19 @@ Este proyecto requiere la librería **Polly**. El archivo `.csproj` ya está con
     dotnet run
     ```
 3.  La aplicación iniciará un bucle infinito que llama a un servicio simulado. Observa la consola para ver cómo la política de Circuit Breaker reacciona a los fallos, abre el circuito y eventualmente lo cierra de nuevo. Para detener la ejecución, presiona `Ctrl + C`.
+
+
+## Sesión 3: Patrón Saga con Orquestación y Colas
+
+Esta sesión demuestra cómo gestionar una transacción distribuida utilizando un orquestador central y colas de mensajes. El código de esta sesión se encuentra en la carpeta `Session3_SagaQueues`.
+
+### Componentes
+
+-   **CommandSender**: Una aplicación de consola que actúa como **Orquestador**. Envía comandos para iniciar el procesamiento de una orden.
+-   **PaymentServiceReceiver**: Una aplicación de consola que actúa como **Worker** o servicio de procesamiento. Escucha los comandos de la cola, ejecuta los pasos de la saga (validar, reservar stock, procesar pago) y maneja las transacciones de compensación en caso de fallo.
+
+### Cómo Ejecutar la Demo
+
+Para ejecutar la demo de la Sesión 3, sigue las instrucciones detalladas en el **Manual del Alumno** a continuación. El manual te guiará a través de la configuración de los recursos necesarios en Azure y la ejecución de las aplicaciones.
+
+---
